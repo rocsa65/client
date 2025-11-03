@@ -6,28 +6,20 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <Router>
+    <Router>
+      <div className="App">
+        <header className="App-header">
+          <h1>MyFinance</h1>
+        </header>
+        <main>
           <Routes>
+            <Route path="/" element={<AccountsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
             {/* Add other routes here if needed */}
           </Routes>
-        </Router>
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+        </main>
+      </div>
+    </Router>
   );
 }
 
