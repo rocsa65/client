@@ -117,6 +117,11 @@ jobs:
         curl -X PATCH \
           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/client \
+          -d '{"visibility":"public"}' || \
+        curl -X PATCH \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/user/packages/container/client \
           -d '{"visibility":"public"}' || echo "Package might already be public or this is the first push"
 
