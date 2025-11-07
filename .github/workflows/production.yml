@@ -79,6 +79,8 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     needs: build
+    # Only run on push to production (merged PRs), not on PR creation
+    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
     
     steps:
     - name: Checkout code
@@ -129,6 +131,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build
     environment: production
+    # Only run when docker-build runs (i.e., on merged PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
     
     steps:
     - name: Create deployment issue
@@ -191,7 +195,7 @@ jobs:
   post-deployment:
     runs-on: ubuntu-latest
     needs: deploy-production
-    if: success()
+    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/production'
     
     steps:
     - name: Tag release
