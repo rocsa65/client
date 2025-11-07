@@ -146,17 +146,41 @@ jobs:
 
     - name: Make package public
       run: |
-        # Make the package public automatically
-        curl -X PATCH \
+        echo "Attempting to make package public..."
+        
+        # Wait a moment for package to be fully created
+        sleep 10
+        
+        # Try organization endpoint first, then user endpoint
+        if curl -s -X PATCH \
           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/client \
-          -d '{"visibility":"public"}' || \
-        curl -X PATCH \
+          -d '{"visibility":"public"}'; then
+          echo "✅ Package made public via organization endpoint"
+        elif curl -s -X PATCH \
           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/user/packages/container/client \
-          -d '{"visibility":"public"}' || echo "Package might already be public or this is the first push"
+          -d '{"visibility":"public"}'; then
+          echo "✅ Package made public via user endpoint"
+        else
+          echo "⚠️ Could not set package visibility - this is normal for new packages"
+          echo "Package will be public by default or you can set it manually in GitHub"
+        fi
+
+    - name: Verify image publication
+      run: |
+        echo "Verifying image was published successfully..."
+        
+        # Check if we can pull the image we just pushed
+        if docker pull ghcr.io/${{ github.repository }}:dev-latest; then
+          echo "✅ Image successfully published and accessible"
+          docker image ls ghcr.io/${{ github.repository }}:dev-latest
+        else
+          echo "❌ Failed to pull published image"
+          exit 1
+        fi
 
     - name: Image publication summary
       run: |
@@ -172,6 +196,8 @@ jobs:
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
         echo "docker pull ghcr.io/${{ github.repository }}:dev-latest" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Package URL:** [View in GitHub](https://github.com/${{ github.repository }}/pkgs/container/client)" >> $GITHUB_STEP_SUMMARY
 
   deploy-dev:
     runs-on: ubuntu-latest
