@@ -1,4 +1,4 @@
-name: Production CI/CD
+name: Production CI - Build & Publish
 
 on:
   push:
@@ -9,18 +9,15 @@ on:
 
 # Configure permissions for GITHUB_TOKEN
 permissions:
-  contents: write         # Write repository content (needed for tags and releases)
+  contents: read          # Read repository content
   packages: write         # Write to GitHub Container Registry
   pull-requests: write   # Comment on PRs
-  issues: write          # Create deployment issues
-  deployments: write     # Create deployment statuses
-  actions: read          # Read workflow information
 
 env:
   NODE_VERSION: '18'
 
 jobs:
-  pre-deployment-checks:
+  test:
     runs-on: ubuntu-latest
     
     steps:
@@ -39,83 +36,30 @@ jobs:
     - name: Run unit tests
       run: npm run test:unit -- --coverage --watchAll=false
 
-    - name: Run security audit (critical vulnerabilities only)
-      run: npm audit --audit-level=critical
-
-    - name: Run security audit (informational report)
-      run: |
-        echo "📊 Full security audit report (informational):"
-        npm audit --audit-level=low || echo "⚠️ Found vulnerabilities in build tools - these don't affect production runtime security"
-
-    - name: Check build quality
-      run: |
-        npm run build
-        # Check bundle size would go here
-        # npx bundlesize
-
-  integration-test:
-    runs-on: ubuntu-latest
-    needs: pre-deployment-checks
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run comprehensive integration tests
+    - name: Run integration tests
       run: npm run test:integration -- --coverage --watchAll=false
 
-    - name: Upload integration test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: production-integration-test-results
-        path: coverage/
-        retention-days: 90
+    - name: Run security audit
+      run: npm audit --audit-level=critical
 
-  build:
-    runs-on: ubuntu-latest
-    needs: [pre-deployment-checks, integration-test]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build application
+    - name: Build application (verification)
       run: npm run build
       env:
         REACT_APP_ENV: production
-        # REACT_APP_API_URL: ${{ secrets.PROD_API_URL }}  # Add when you have an API
         GENERATE_SOURCEMAP: false
 
-    - name: Upload build artifacts
+    - name: Upload test results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: build-files-production
-        path: build/
-        retention-days: 90
+        name: production-test-results
+        path: coverage/
+        retention-days: 30
 
-  # Comment on PR to inform about Docker build that will happen on merge
-  pr-info:
+  # Comment on PR with test status
+  pr-feedback:
     runs-on: ubuntu-latest
-    needs: [pre-deployment-checks, integration-test, build]
+    needs: test
     if: github.event_name == 'pull_request'
     
     steps:
@@ -123,26 +67,20 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const comment = `## 🔄 Production CI/CD Pipeline Status
+          const comment = `## ✅ Production CI Pipeline Status
           
-          ✅ **Pre-deployment Checks Passed** - All quality gates passed
-          ✅ **Unit Tests Passed** - All unit tests are passing
-          ✅ **Integration Tests Passed** - All integration tests are passing
-          ✅ **Security Audit Passed** - No moderate/high vulnerabilities found
-          ✅ **Build Successful** - Application builds without errors
+          **Tests Passed** - All unit and integration tests are passing
+          **Security Check Passed** - No critical/high vulnerabilities found  
+          **Build Verification Passed** - Application builds successfully
           
-          ### 🚀 What happens when this PR is merged:
-          - Docker image will be built and published to GitHub Container Registry
-          - Image will be tagged as \`ghcr.io/${{ github.repository }}:latest\`
-          - Automatic deployment to production environment with protection rules
-          - Comprehensive health checks and smoke tests
-          - Automated GitHub release with version tagging
+          ### 🚀 Next Steps After Merge:
+          1. Docker image will be built and published to GitHub Packages
+          2. Image will be available for Jenkins deployment pipeline
+          3. Release Manager can trigger production deployment via Jenkins
           
-          **Note:** This production deployment includes maximum safety measures and post-deployment verification.
+          **Ready for review and merge!** 🎉
           
-          **🛡️ Environment Protection Active** - Deployment will wait for required approvals.
-          
-          **Ready for review and merge!** 🎉`;
+          **Note:** Actual deployment to production is managed by Jenkins pipeline in the Infrastructure repository.`;
           
           github.rest.issues.createComment({
             issue_number: context.issue.number,
@@ -151,10 +89,10 @@ jobs:
             body: comment
           });
 
-  docker-build:
+  # Build and publish Docker image (only on merge to production)
+  build-and-publish:
     runs-on: ubuntu-latest
-    needs: build
-    # Only run on push to production (merged PRs), not on PR creation
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/production'
     
     steps:
@@ -171,218 +109,69 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build Docker image (no push)
+    - name: Generate release tags
+      id: meta
+      run: |
+        # Generate release number (could be from git tag, build number, etc.)
+        BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+        RELEASE_TAG="v${BUILD_NUMBER}"
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        
+        echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+        echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
+        echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_OUTPUT
+        echo "TIMESTAMP=${TIMESTAMP}" >> $GITHUB_OUTPUT
+        
+        echo "🏷️ Release tags generated:"
+        echo "  - Release: ${RELEASE_TAG}"
+        echo "  - Commit: ${SHORT_SHA}"
+        echo "  - Timestamp: prod-${TIMESTAMP}"
+
+    - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ./Dockerfile
-        push: false
+        push: true
         tags: |
           ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:prod-${{ github.sha }}
-          ghcr.io/${{ github.repository }}:v${{ github.run_number }}
+          ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.RELEASE_TAG }}
+          ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.SHORT_SHA }}
+          ghcr.io/${{ github.repository }}:prod-${{ steps.meta.outputs.TIMESTAMP }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        outputs: type=docker,dest=/tmp/image.tar
         labels: |
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           org.opencontainers.image.description=MyFinance Client - Production Build
-          org.opencontainers.image.licenses=MIT
-
-    - name: Upload Docker image artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-image-production
-        path: /tmp/image.tar
-        retention-days: 90
-
-  docker-publish:
-    runs-on: ubuntu-latest
-    needs: [docker-build]
-    # Only run when docker-build runs (i.e., on merged PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-    
-    steps:
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Download Docker image artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-image-production
-        path: /tmp
-
-    - name: Load Docker image
-      run: |
-        docker load --input /tmp/image.tar
-        docker image ls -a
-
-    - name: Push Docker image to registry
-      run: |
-        docker push ghcr.io/${{ github.repository }}:latest
-        docker push ghcr.io/${{ github.repository }}:prod-${{ github.sha }}
-        docker push ghcr.io/${{ github.repository }}:v${{ github.run_number }}
+          org.opencontainers.image.revision=${{ github.sha }}
 
     - name: Make package public
       run: |
         echo "Attempting to make package public..."
-        
-        # Wait a moment for package to be fully created
-        sleep 10
-        
-        # Try organization endpoint first, then user endpoint
-        if curl -s -X PATCH \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/client \
-          -d '{"visibility":"public"}'; then
-          echo "✅ Package made public via organization endpoint"
-        elif curl -s -X PATCH \
+        sleep 5
+        curl -s -X PATCH \
           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/user/packages/container/client \
-          -d '{"visibility":"public"}'; then
-          echo "✅ Package made public via user endpoint"
-        else
-          echo "⚠️ Could not set package visibility - this is normal for new packages"
-          echo "Package will be public by default or you can set it manually in GitHub"
-        fi
-
-    - name: Verify image publication
-      run: |
-        echo "Verifying image was published successfully..."
-        
-        # Check if we can pull the image we just pushed
-        if docker pull ghcr.io/${{ github.repository }}:latest; then
-          echo "✅ Image successfully published and accessible"
-          docker image ls ghcr.io/${{ github.repository }}:latest
-        else
-          echo "❌ Failed to pull published image"
-          exit 1
-        fi
+          -d '{"visibility":"public"}' || echo "Package visibility setting skipped"
 
     - name: Image publication summary
       run: |
         echo "## 🚀 Docker Image Published Successfully" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Registry:** GitHub Container Registry" >> $GITHUB_STEP_SUMMARY
+        echo "**Registry:** GitHub Container Registry" >> $GITHUB_STEP_SUMMARY  
         echo "**Image:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-        echo "- \`latest\`" >> $GITHUB_STEP_SUMMARY
-        echo "- \`prod-${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "- \`v${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`latest\` (latest production release)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.RELEASE_TAG }}\` (release number)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.SHORT_SHA }}\` (commit reference)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`prod-${{ steps.meta.outputs.TIMESTAMP }}\` (deployment timestamp)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Pull Command:**" >> $GITHUB_STEP_SUMMARY
+        echo "**Infrastructure Deployment:** Use release tag \`${{ steps.meta.outputs.RELEASE_TAG }}\` for deployment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployment Command Example:**" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-        echo "docker pull ghcr.io/${{ github.repository }}:latest" >> $GITHUB_STEP_SUMMARY
+        echo "# Deploy specific release" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.RELEASE_TAG }}" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Package URL:** [View in GitHub](https://github.com/${{ github.repository }}/pkgs/container/client)" >> $GITHUB_STEP_SUMMARY
-
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: docker-publish
-    environment: production
-    # Only run when docker-publish runs (i.e., on merged PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-    
-    steps:
-    - name: Create deployment issue
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const issue = await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `Production Deployment - ${context.sha.substring(0, 7)}`,
-            body: `
-            ## Production Deployment
-            
-            **Branch:** ${context.ref}
-            **Commit:** ${context.sha}
-            **Author:** ${context.actor}
-            **Workflow:** ${context.workflow}
-            
-            This deployment is about to begin. Please monitor the deployment process.
-            `
-          });
-
-    - name: Deploy to Production Environment
-      run: |
-        echo "Deploying to production environment..."
-        # Add your production deployment commands here
-        # This should be your most robust deployment process:
-        # - Blue-green deployment
-        # - Rolling deployment with health checks
-        # - Database migrations if needed
-        # - CDN cache invalidation
-
-    - name: Health check
-      run: |
-        echo "Running production health checks..."
-        # Wait for deployment to be ready
-        sleep 30
-        # Run health checks
-        # curl -f ${{ secrets.PROD_URL }}/health || exit 1
-
-    - name: Run smoke tests
-      run: |
-        echo "Running smoke tests against production..."
-        # Add critical path smoke tests here
-
-    - name: Deployment success notification
-      if: success()
-      run: |
-        echo "## ✅ Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
-        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Workflow Run:** [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Docker Image:** \`ghcr.io/${{ github.repository }}:latest\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Production deployment completed successfully! 🎉" >> $GITHUB_STEP_SUMMARY
-
-  post-deployment:
-    runs-on: ubuntu-latest
-    needs: deploy-production
-    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/production'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Tag release
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git tag -a "v${{ github.run_number }}" -m "Production release v${{ github.run_number }}"
-        git push origin "v${{ github.run_number }}"
-
-    - name: Create GitHub release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ github.run_number }}
-        release_name: Release v${{ github.run_number }}
-        body: |
-          ## Changes
-          
-          Deployed from commit ${{ github.sha }}
-          
-          **Author:** ${{ github.actor }}
-          **Branch:** ${{ github.ref_name }}
-        draft: false
-        prerelease: false

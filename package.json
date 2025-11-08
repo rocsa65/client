@@ -25,13 +25,9 @@
     "test:unit": "react-scripts test --testPathIgnorePatterns=\".*integration.*\" --coverage --watchAll=false",
     "test:integration": "react-scripts test --testPathPattern=\"integration\" --coverage --watchAll=false",
     "test:coverage": "react-scripts test --coverage --watchAll=false",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx --max-warnings 10",
+    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
     "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
   },
   "browserslist": {
     "production": [
