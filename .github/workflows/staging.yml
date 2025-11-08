@@ -3,11 +3,14 @@ name: Staging CI/CD
 on:
   push:
     branches: [ staging ]
+  pull_request:
+    branches: [ staging ]
 
 # Configure permissions for GITHUB_TOKEN
 permissions:
   contents: read          # Read repository content
   packages: write         # Write to GitHub Container Registry
+  pull-requests: write   # Comment on PRs
   issues: write          # Create issues if needed
 
 env:
@@ -105,6 +108,41 @@ jobs:
         name: build-files-staging
         path: build/
         retention-days: 30
+
+  # Comment on PR to inform about Docker build that will happen on merge
+  pr-info:
+    runs-on: ubuntu-latest
+    needs: [test, integration-test, security-scan, build]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const comment = `## 🔄 Staging CI/CD Pipeline Status
+          
+          ✅ **Unit Tests Passed** - All unit tests are passing
+          ✅ **Integration Tests Passed** - All integration tests are passing  
+          ✅ **Security Scan Passed** - No high-severity vulnerabilities found
+          ✅ **Build Successful** - Application builds without errors
+          
+          ### 🚀 What happens when this PR is merged:
+          - Docker image will be built and published to GitHub Container Registry
+          - Image will be tagged as \`ghcr.io/${{ github.repository }}:staging-latest\`
+          - Automatic deployment to staging environment
+          - Smoke tests will be executed against staging environment
+          
+          **Note:** This staging deployment includes comprehensive quality assurance and security validation.
+          
+          **Ready to merge!** 🎉`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
 
   docker-build:
     runs-on: ubuntu-latest
