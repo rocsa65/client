@@ -150,10 +150,10 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const comment = \`## ✅ Staging CI Pipeline Status
+          const comment = `## ✅ Staging CI Pipeline Status
           
           **Tests Passed** - All unit and integration tests are passing
-          **Security Check Passed** - No moderate/high vulnerabilities found
+          **Security Check Passed** - No critical vulnerabilities found
           **Build Verification Passed** - Application builds successfully for staging
           
           ### 🎯 Ready for Staging Review
@@ -164,7 +164,7 @@ jobs:
           2. Deploy to staging environment for QA testing
           3. After QA approval → Merge to production branch
           
-          **Note:** Staging deployment enables comprehensive QA and integration testing.\`;
+          **Note:** Staging deployment enables comprehensive QA and integration testing.`;
           
           github.rest.issues.createComment({
             issue_number: context.issue.number,
