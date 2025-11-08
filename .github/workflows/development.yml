@@ -32,8 +32,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run tests
-      run: npm test -- --coverage --watchAll=false
+    - name: Run unit tests
+      run: npm run test:unit -- --coverage --watchAll=false
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -84,13 +84,15 @@ jobs:
         script: |
           const comment = `## 🔄 CI/CD Pipeline Status
           
-          ✅ **Tests Passed** - All tests are passing
+          ✅ **Unit Tests Passed** - All unit tests are passing
           ✅ **Build Successful** - Application builds without errors
           
           ### 🚀 What happens when this PR is merged:
           - Docker image will be built and published to GitHub Container Registry
           - Image will be tagged as \`ghcr.io/${{ github.repository }}:dev-latest\`
           - Automatic deployment to development environment
+          
+          **Note:** Integration tests will run on staging and production pipelines for comprehensive validation.
           
           **Ready to merge!** 🎉`;
           
