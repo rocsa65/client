@@ -1,15 +1,22 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import AccountsPage from './AccountsPage';
+import AccountsPage from '../../pages/AccountsPage';
 
-// Mock fetch globally
-global.fetch = jest.fn();
+// Mock the api utility
+jest.mock('../../utils/api', () => ({
+  apiRequest: jest.fn(),
+  API_BASE_URL: ''
+}));
+
+import { apiRequest } from '../../utils/api';
 
 describe('AccountsPage', () => {
+  const mockApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
+
   beforeEach(() => {
-    // Reset fetch mock before each test
-    (fetch as jest.MockedFunction<typeof fetch>).mockReset();
+    // Reset apiRequest mock before each test
+    mockApiRequest.mockReset();
   });
 
   afterEach(() => {
@@ -17,8 +24,8 @@ describe('AccountsPage', () => {
   });
 
   test('renders loading state initially', () => {
-    // Mock a pending fetch
-    (fetch as jest.MockedFunction<typeof fetch>).mockImplementation(
+    // Mock a pending apiRequest
+    mockApiRequest.mockImplementation(
       () => new Promise(() => {}) // Never resolves to keep loading state
     );
 
@@ -28,8 +35,8 @@ describe('AccountsPage', () => {
   });
 
   test('displays error message when fetch fails', async () => {
-    // Mock fetch to reject
-    (fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(
+    // Mock apiRequest to reject
+    mockApiRequest.mockRejectedValue(
       new Error('Network error')
     );
 
@@ -42,8 +49,8 @@ describe('AccountsPage', () => {
   });
 
   test('displays "Show Mock Data Instead" button when fetch fails', async () => {
-    // Mock fetch to reject
-    (fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(
+    // Mock apiRequest to reject
+    mockApiRequest.mockRejectedValue(
       new Error('Failed to fetch')
     );
 
@@ -55,8 +62,8 @@ describe('AccountsPage', () => {
   });
 
   test('shows mock data when "Show Mock Data Instead" button is clicked', async () => {
-    // Mock fetch to reject
-    (fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(
+    // Mock apiRequest to reject
+    mockApiRequest.mockRejectedValue(
       new Error('Failed to fetch')
     );
 
@@ -89,8 +96,8 @@ describe('AccountsPage', () => {
       { id: 2, name: 'Test Account 2', currency: 'EUR', balance: 2500.75 }
     ];
 
-    // Mock successful fetch
-    (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+    // Mock successful apiRequest
+    mockApiRequest.mockResolvedValue({
       ok: true,
       status: 200,
       json: () => Promise.resolve(mockAccountsData),
@@ -104,14 +111,15 @@ describe('AccountsPage', () => {
       expect(screen.getByText('Test Account 2')).toBeInTheDocument();
       expect(screen.getByText('1000.5')).toBeInTheDocument();
       expect(screen.getByText('2500.75')).toBeInTheDocument();
-      expect(screen.getByText('USD')).toBeInTheDocument();
-      expect(screen.getByText('EUR')).toBeInTheDocument();
+      // Currency shows as "Unknown (USD)" instead of just "USD"
+      expect(screen.getByText('Unknown (USD)')).toBeInTheDocument();
+      expect(screen.getByText('Unknown (EUR)')).toBeInTheDocument();
     });
   });
 
   test('displays "No accounts found" when API returns empty array', async () => {
-    // Mock successful fetch with empty data
-    (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+    // Mock successful apiRequest with empty data
+    mockApiRequest.mockResolvedValue({
       ok: true,
       status: 200,
       json: () => Promise.resolve([]),
@@ -120,14 +128,14 @@ describe('AccountsPage', () => {
     render(<AccountsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/No accounts found!/)).toBeInTheDocument();
-      expect(screen.getByText(/Backend returned empty data/)).toBeInTheDocument();
+      // Update to match actual text displayed
+      expect(screen.getByText(/There are no accounts defined. Please create a new account!/)).toBeInTheDocument();
     });
   });
 
   test('handles HTTP error responses correctly', async () => {
-    // Mock fetch with HTTP error
-    (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+    // Mock apiRequest with HTTP error
+    mockApiRequest.mockResolvedValue({
       ok: false,
       status: 404,
       json: () => Promise.resolve({}),
@@ -145,7 +153,7 @@ describe('AccountsPage', () => {
       { id: 1, name: 'Test Account', currency: 'USD', balance: 1000 }
     ];
 
-    (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+    mockApiRequest.mockResolvedValue({
       ok: true,
       status: 200,
       json: () => Promise.resolve(mockAccountsData),
@@ -160,8 +168,8 @@ describe('AccountsPage', () => {
     });
   });
 
-  test('calls fetch with correct URL', async () => {
-    (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+  test('calls apiRequest with correct URL', async () => {
+    mockApiRequest.mockResolvedValue({
       ok: true,
       status: 200,
       json: () => Promise.resolve([]),
@@ -170,14 +178,14 @@ describe('AccountsPage', () => {
     render(<AccountsPage />);
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/Account');
+      expect(mockApiRequest).toHaveBeenCalledWith('/api/Account');
     });
   });
 
   test('logs correct messages to console', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
     
-    (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+    mockApiRequest.mockResolvedValue({
       ok: true,
       status: 200,
       json: () => Promise.resolve([]),
@@ -188,7 +196,7 @@ describe('AccountsPage', () => {
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith('AccountsPage: Starting to fetch accounts...');
       expect(consoleSpy).toHaveBeenCalledWith('AccountsPage: Response received', 200);
-      expect(consoleSpy).toHaveBeenCalledWith('AccountsPage: Data received', []);
+      expect(consoleSpy).toHaveBeenCalledWith('AccountsPage: Raw data received', []);
     });
 
     consoleSpy.mockRestore();

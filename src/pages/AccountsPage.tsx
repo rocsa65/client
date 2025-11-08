@@ -9,15 +9,6 @@ type Account = {
   balance: number;
 };
 
-// API response might use PascalCase, so let's also define that
-type ApiAccount = {
-  Id: number;
-  Name: string;
-  Identifier: string;
-  Currency: number;
-  Balance: number;
-};
-
 // Helper function to convert currency enum to display string
 const getCurrencyDisplay = (currency: number): string => {
   console.log('getCurrencyDisplay called with:', currency, typeof currency);
