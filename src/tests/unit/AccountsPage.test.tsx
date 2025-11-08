@@ -3,13 +3,13 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AccountsPage from '../../pages/AccountsPage';
 
+import { apiRequest } from '../../utils/api';
+
 // Mock the api utility
 jest.mock('../../utils/api', () => ({
   apiRequest: jest.fn(),
   API_BASE_URL: ''
 }));
-
-import { apiRequest } from '../../utils/api';
 
 describe('AccountsPage', () => {
   const mockApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
