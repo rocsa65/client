@@ -1,9 +1,9 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import App from './App';
+import App from '../../App';
 
 // Mock the AccountsPage component since we're testing App in isolation
-jest.mock('./pages/AccountsPage', () => {
+jest.mock('../../pages/AccountsPage', () => {
   return function MockAccountsPage() {
     return <div data-testid="accounts-page">Mocked AccountsPage</div>;
   };

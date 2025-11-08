@@ -1,4 +1,21 @@
-##
+# MyFinance Client
+
+[![Development CI/CD](https://github.com/rocsa65/client/actions/workflows/development.yml/badge.svg?branch=development)](https://github.com/rocsa65/client/actions/workflows/development.yml)
+[![Staging CI/CD](https://github.com/rocsa65/client/actions/workflows/staging.yml/badge.svg?branch=staging)](https://github.com/rocsa65/client/actions/workflows/staging.yml)
+[![Production CI/CD](https://github.com/rocsa65/client/actions/workflows/production.yml/badge.svg?branch=production)](https://github.com/rocsa65/client/actions/workflows/production.yml)
+
+A React-based financial management application with automated CI/CD pipelines.
+
+## 🚀 Deployment Status
+
+- **Development**: Latest features and ongoing development
+- **Staging**: Quality assurance and pre-production testing  
+- **Production**: Stable release version
+
+## 📋 CI/CD Setup
+
+This project uses GitHub Actions for automated deployments across three environments. See [CICD-SETUP.md](./CICD-SETUP.md) for detailed setup instructions.
+
 ## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
