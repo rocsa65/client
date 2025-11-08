@@ -1,0 +1,20 @@
+{
+  "extends": [
+    "react-app",
+    "react-app/jest"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "warn",
+    "testing-library/no-wait-for-multiple-assertions": "warn",
+    "import/first": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.{js,jsx,ts,tsx}", "**/*.spec.{js,jsx,ts,tsx}"],
+      "rules": {
+        "testing-library/no-wait-for-multiple-assertions": "off",
+        "@typescript-eslint/no-unused-vars": "warn"
+      }
+    }
+  ]
+}
