@@ -337,19 +337,19 @@ jobs:
         echo "Running smoke tests against production..."
         # Add critical path smoke tests here
 
-    - name: Update deployment status
+    - name: Deployment success notification
       if: success()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          await github.rest.repos.createDeploymentStatus({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            deployment_id: context.payload.deployment?.id || 0,
-            state: 'success',
-            environment: 'production',
-            log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
-          });
+      run: |
+        echo "## ✅ Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Workflow Run:** [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Docker Image:** \`ghcr.io/${{ github.repository }}:latest\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Production deployment completed successfully! 🎉" >> $GITHUB_STEP_SUMMARY
 
   post-deployment:
     runs-on: ubuntu-latest
