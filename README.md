@@ -10,31 +10,63 @@ A React-based financial management application with automated CI/CD pipelines.
 
 ### ✅ Implemented Features
 - **React Application**: Modern React 19 with TypeScript
-- **Three-Branch Strategy**: development → staging → production
-- **GitHub Actions CI/CD**: Automated testing and deployment pipelines
+- **Multi-Stage CI/CD Pipelines**: Structured workflows with clear stages
+- **Manual Docker Approval**: Controlled image publishing for staging/production
+- **GitHub Actions**: Automated testing and deployment
 - **Unit Tests**: Jest + React Testing Library
-- **Integration Tests**: API integration testing
-- **Docker Support**: Containerized application
-- **GitHub Container Registry**: Automated image publishing
+- **Integration Tests**: API integration testing (staging/production)
+- **Docker Support**: Containerized application with Nginx
+- **GitHub Container Registry**: Automated image publishing to GHCR
+- **PR Feedback**: Automatic updates with pipeline status
 
 ### 🔄 Planned Enhancements
 - **UI Tests**: Cypress end-to-end testing
 - **Health Check Endpoints**: Application monitoring
-- **Jenkins Orchestration**: Local container setup
 - **Blue-Green Deployment**: Zero-downtime deployments
 - **Infrastructure Repository**: Separate infrastructure management
 
-## 📋 Current CI/CD Pipeline
+## 📋 CI/CD Pipeline
+
+### Pipeline Architecture
+
+All workflows follow a structured, multi-stage approach:
+
+**Development Pipeline:**
+1. 📦 Build Application
+2. 🧪 Unit Tests
+3. ✅ Build Verification
+4. 💬 PR Feedback
+
+**Staging Pipeline:**
+1. 📦 Build Application
+2. 🧪 Unit Tests
+3. 🔗 Integration Tests
+4. ✅ Build Verification
+5. ⏸️ **Docker Publish Approval** (manual gate)
+6. 🐳 Docker Build & Publish to GHCR
+7. 💬 PR Feedback
+
+**Production Pipeline:**
+1. 📦 Build Application
+2. 🧪 Unit Tests
+3. 🔗 Integration Tests
+4. ✅ Build Verification
+5. 💬 PR Feedback
+6. ⏸️ **Docker Publish Approval** (manual gate)
+7. 🐳 Docker Build & Publish with versioning
+
+### Manual Approval Gates
+
+For staging and production environments:
+- **Docker builds require manual approval** before publishing
+- Prevents accidental deployments
+- Provides explicit control over image publishing
+- Approval via "Review deployments" button in GitHub Actions UI
 
 ### Branch Strategy
-- **development**: Feature development and testing
-- **staging**: Pre-production testing and integration
-- **production**: Live production releases
-
-### Automated Workflows
-1. **Development**: Unit tests → Build → Deploy to dev environment
-2. **Staging**: Unit tests → Integration tests → Security scan → Build → Deploy to staging
-3. **Production**: Comprehensive testing → Build → Docker publish → Deploy to production
+- **development**: Feature development and fast feedback
+- **staging**: Pre-production testing with manual Docker publish control
+- **production**: Live production releases with manual Docker publish control
 
 ## 🛠️ Technology Stack
 
@@ -104,11 +136,14 @@ src/
 
 ### Feature Development
 ```bash
-# Create feature branch
-git checkout -b feature/your-feature-name development
+# Create feature branch from development
+git checkout development
+git pull origin development
+git checkout -b feature/your-feature-name
 
 # Make changes and test
 npm test
+npm run build
 
 # Commit and push
 git add .
@@ -116,19 +151,24 @@ git commit -m "feat: your feature description"
 git push origin feature/your-feature-name
 
 # Create pull request to development branch
+# Pipeline runs: Build → Unit Tests → Build Verification → PR Feedback
 ```
 
-### Release Process
+### Staging Promotion
 ```bash
-# Merge development → staging (triggers staging pipeline)
-git checkout staging
-git merge development
-git push origin staging
+# Merge development → staging
+# After merge, pipeline runs and pauses at Docker Publish Approval
+# Go to GitHub Actions → Click "Review deployments" → Approve
+# Docker image is built and published to GHCR
+```
 
-# After testing, merge staging → production (triggers production pipeline)
-git checkout production
-git merge staging
-git push origin production
+### Production Release
+```bash
+# Merge staging → production
+# After merge, pipeline runs comprehensive tests
+# Then pauses at Docker Publish Approval
+# Go to GitHub Actions → Click "Review deployments" → Approve  
+# Docker image is built with multiple version tags
 ```
 
 ## 📊 Testing Strategy
@@ -145,15 +185,35 @@ git push origin production
 
 ## 🐳 Docker Deployment
 
-The application is automatically containerized and published to GitHub Container Registry:
+The application is containerized and published to GitHub Container Registry with manual approval:
 
+**Staging Images:**
 ```bash
-# Pull latest image
+# Pull latest staging image (after approval)
+docker pull ghcr.io/rocsa65/client:staging-latest
+
+# Or pull specific commit version
+docker pull ghcr.io/rocsa65/client:staging-{commit-sha}
+
+# Run container
+docker run -p 80:80 ghcr.io/rocsa65/client:staging-latest
+```
+
+**Production Images:**
+```bash
+# Pull latest production image (after approval)
 docker pull ghcr.io/rocsa65/client:latest
 
-# Run production container
+# Or pull specific version
+docker pull ghcr.io/rocsa65/client:v{build-number}
+
+# Run container
 docker run -p 80:80 ghcr.io/rocsa65/client:latest
 ```
+
+**Image Tags:**
+- Staging: `staging-latest`, `staging-{commit-sha}`
+- Production: `latest`, `v{build-number}`, `{commit-sha}`, `prod-{timestamp}`
 
 ## 📚 Documentation
 
@@ -178,20 +238,23 @@ docker run -p 80:80 ghcr.io/rocsa65/client:latest
 
 ## 📈 Roadmap
 
-### Phase 1 (Current)
-- ✅ Basic React application
-- ✅ GitHub Actions CI/CD
-- ✅ Multi-environment deployment
+### Phase 1 (Current) ✅
+- ✅ Multi-stage pipeline architecture
+- ✅ GitHub Actions CI/CD with manual approval gates
+- ✅ Unit and integration testing
+- ✅ Docker containerization with GHCR
+- ✅ Automated PR feedback
 
 ### Phase 2 (Next)
 - [ ] UI test automation (Cypress)
 - [ ] Health check endpoints
-- [ ] Enhanced monitoring
+- [ ] Enhanced monitoring and alerting
+- [ ] Performance testing
 
 ### Phase 3 (Future)
-- [ ] Jenkins orchestration
 - [ ] Blue-green deployments
 - [ ] Infrastructure as Code
+- [ ] Multi-region support
 - [ ] Advanced security scanning
 
 ## 🆘 Troubleshooting
