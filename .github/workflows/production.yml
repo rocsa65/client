@@ -17,38 +17,108 @@ env:
   NODE_VERSION: '18'
 
 jobs:
-  test:
+  # ====================================
+  # STAGE 1: Build
+  # ====================================
+  build:
+    name: "Build Application"
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
+    # --- Setup Stage ---
+    - name: 📥 Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
+    - name: ⚙️ Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
 
-    - name: Install dependencies
+    - name: 📦 Install dependencies
       run: npm ci
 
-    - name: Run unit tests
-      run: npm run test:unit -- --coverage --watchAll=false
-
-    - name: Run integration tests
-      run: npm run test:integration -- --coverage --watchAll=false
-
-    - name: Run security audit
-      run: npm audit --audit-level=critical
-
-    - name: Build application (verification)
+    # --- Build Stage ---
+    - name: 🔨 Build application
       run: npm run build
       env:
         REACT_APP_ENV: production
         GENERATE_SOURCEMAP: false
 
-    - name: Upload test results
+    # --- Security Stage ---
+    - name: 🔒 Run security audit
+      run: npm audit --audit-level=critical
+
+  # ====================================
+  # STAGE 2: Unit Tests
+  # ====================================
+  unit-tests:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    # --- Setup Stage ---
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci
+
+    # --- Test Stage ---
+    - name: 🧪 Run unit tests
+      run: npm run test:unit -- --coverage --watchAll=false
+
+    # --- Coverage Stage ---
+    - name: 📊 Upload unit test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unit-tests
+        fail_ci_if_error: false
+
+  # ====================================
+  # STAGE 3: Integration Tests
+  # ====================================
+  integration-tests:
+    name: "Integration Tests"
+    runs-on: ubuntu-latest
+    needs: [build, unit-tests]
+
+    steps:
+    # --- Setup Stage ---
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci
+
+    # --- Test Stage ---
+    - name: 🔗 Run integration tests
+      run: npm run test:integration -- --coverage --watchAll=false
+
+    # --- Coverage Stage ---
+    - name: 📊 Upload integration test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: integration-tests
+        fail_ci_if_error: false
+
+    # --- Artifact Stage ---
+    - name: 📤 Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -56,75 +126,151 @@ jobs:
         path: coverage/
         retention-days: 30
 
-  # Comment on PR with test status
-  pr-feedback:
+  # ====================================
+  # STAGE 4: Build Verification
+  # ====================================
+  build-verification:
+    name: "Build Verification"
     runs-on: ubuntu-latest
-    needs: test
+    needs: [build, unit-tests, integration-tests]
+    
+    steps:
+    # --- Setup Stage ---
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci
+
+    # --- Build Stage ---
+    - name: 🔨 Build application (Release)
+      run: npm run build
+      env:
+        REACT_APP_ENV: production
+        GENERATE_SOURCEMAP: false
+
+    # --- Artifact Stage ---
+    - name: 📤 Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: production-build
+        path: build/
+        retention-days: 30
+
+  # ====================================
+  # STAGE 5: PR Feedback
+  # ====================================
+  pr-feedback:
+    name: "PR Feedback"
+    runs-on: ubuntu-latest
+    needs: [build, unit-tests, integration-tests, build-verification]
     if: github.event_name == 'pull_request'
     
     steps:
-    - name: Comment on PR
+    - name: 💬 Update PR with status
       uses: actions/github-script@v7
       with:
         script: |
-          const comment = `## ✅ Production CI Pipeline Status
-          
-          **Tests Passed** - All unit and integration tests are passing
-          **Security Check Passed** - No critical/high vulnerabilities found  
-          **Build Verification Passed** - Application builds successfully
-          
+          const commentBody = `## ✅ Production CI Pipeline Status
+
+          **Build Status** - ✅ Passed
+          **Unit Tests** - ✅ All tests passing
+          **Integration Tests** - ✅ All tests passing
+          **Build Verification** - ✅ Application builds successfully
+          **Security Check** - ✅ No critical/high vulnerabilities found
+
           ### 🚀 Next Steps After Merge:
           1. Docker image will be built and published to GitHub Packages
           2. Image will be available for Jenkins deployment pipeline
           3. Release Manager can trigger production deployment via Jenkins
-          
+
           **Ready for review and merge!** 🎉
-          
-          **Note:** Actual deployment to production is managed by Jenkins pipeline in the Infrastructure repository.`;
-          
-          github.rest.issues.createComment({
+
+          **Note:** Actual deployment to production is managed by Jenkins pipeline in the Infrastructure repository.
+
+          ---
+          *Last updated: ${new Date().toUTCString()}*
+          *Commit: ${context.sha.substring(0, 7)}*`;
+
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: comment
           });
 
-  # Manual approval gate for Docker image publishing
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('Production CI Pipeline Status')
+          );
+
+          // Update existing comment or create new one
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              comment_id: botComment.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+          } else {
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+          }
+
+  # ====================================
+  # STAGE 6: Docker Publish Approval
+  # ====================================
   docker-publish-approval:
+    name: "Docker Publish Approval"
     runs-on: ubuntu-latest
-    needs: test
+    needs: [build, unit-tests, integration-tests, build-verification]
     if: github.event_name == 'push' && github.ref == 'refs/heads/production'
     environment:
       name: production-docker-publish
       url: https://github.com/${{ github.repository }}/pkgs/container/client
     
     steps:
-    - name: Approval checkpoint
+    - name: ✅ Approval checkpoint
       run: |
         echo "✅ Manual approval granted for Docker image publishing"
         echo "Proceeding to build and publish production Docker image..."
 
-  # Build and publish Docker image (runs after approval)
+  # ====================================
+  # STAGE 7: Docker Build & Publish
+  # ====================================
   build-and-publish:
+    name: "Docker Build & Publish to GHCR"
     runs-on: ubuntu-latest
     needs: docker-publish-approval
     if: github.event_name == 'push' && github.ref == 'refs/heads/production'
     
     steps:
-    - name: Checkout code
+    # --- Setup Stage ---
+    - name: 📥 Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
+    - name: 🐳 Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Login to GitHub Container Registry
+    - name: 🔐 Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Generate release tags
+    # --- Tag Generation Stage ---
+    - name: 🏷️ Generate release tags
       id: meta
       run: |
         # Generate release number (could be from git tag, build number, etc.)
@@ -143,7 +289,8 @@ jobs:
         echo "  - Commit: ${SHORT_SHA}"
         echo "  - Timestamp: prod-${TIMESTAMP}"
 
-    - name: Build and push Docker image
+    # --- Build & Push Stage ---
+    - name: 🔨 Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -161,7 +308,8 @@ jobs:
           org.opencontainers.image.description=MyFinance Client - Production Build
           org.opencontainers.image.revision=${{ github.sha }}
 
-    - name: Make package public
+    # --- Post-Publish Stage ---
+    - name: 🌐 Make package public
       run: |
         echo "Attempting to make package public..."
         sleep 5
@@ -171,7 +319,7 @@ jobs:
           https://api.github.com/user/packages/container/client \
           -d '{"visibility":"public"}' || echo "Package visibility setting skipped"
 
-    - name: Image publication summary
+    - name: 📋 Image publication summary
       run: |
         echo "## 🚀 Production Docker Image Published Successfully" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
