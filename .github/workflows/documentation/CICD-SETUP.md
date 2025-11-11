@@ -1,354 +1,69 @@
-# GitHub Actions CI/CD Pipeline Setup# GitHub Actions CI/CD Pipeline Setup
+# GitHub Actions CI/CD Pipeline Setup
 
+This repository uses GitHub Actions for Continuous Integration and Continuous Deployment (CI/CD) across three environments:
 
+- **Development**: Fast feedback on feature development  
+- **Staging**: Comprehensive testing with manual Docker publish approval
+- **Production**: Full production deployments with manual Docker publish approval
 
-This repository uses GitHub Actions for Continuous Integration and Continuous Deployment (CI/CD) across three environments.This repository uses GitHub Actions for Continuous Integration and Continuous Deployment (CI/CD) across three environments:
-
-
-
-## 🚀 Current Implementation- **Development**: Optimized deployments on merged PRs to `development` branch
-
-- **Staging**: Comprehensive deployments on merged PRs to `staging` branch  
-
-### Three-Branch Strategy- **Production**: Full production deployments on merged PRs to `production` branch
-
-- **development**: Feature development and testing
-
-- **staging**: Pre-production testing and integration  ## 🚀 Optimized Pipeline Overview
-
-- **production**: Live production releases
-
-### Key Pipeline Strategy
-
-### Pipeline Architecture**Docker images are built and published ONLY when PRs are merged**, not on every commit. This provides:
-
-**Docker images are built and published ONLY when PRs are merged**, providing:- ✅ **Resource efficiency**: No unnecessary Docker builds
-
-- ✅ **Resource efficiency**: No unnecessary Docker builds during PR validation- ✅ **Cleaner registry**: Only production-ready images
-
-- ✅ **Cleaner registry**: Only production-ready images- ✅ **Faster feedback**: PR validation without Docker overhead
-
-- ✅ **Faster feedback**: Quick PR validation without Docker overhead- ✅ **Cost optimization**: Reduced GitHub Actions usage
-
-- ✅ **Cost optimization**: Reduced GitHub Actions usage
+## 🚀 Pipeline Overview
 
 ### Development Pipeline (`development.yml`)
 
-## 📋 Current Pipeline Stages**On Pull Request:**
+**Triggered on:**
+- Push to `development`, `feature/*`, `hotfix/*` branches
+- Pull requests to `development` branch
 
-- Run tests with coverage
+**Pipeline Stages:**
+1. **📦 Build Application** - Builds React app and runs security audit
+2. **🧪 Unit Tests** - Runs unit tests with code coverage
+3. **✅ Build Verification** - Final build verification with artifacts (7-day retention)
+4. **💬 PR Feedback** - Updates PR with comprehensive status
 
-### Development Pipeline (`development.yml`)- Build application verification
+**Focus**: Fast feedback for developers, no Docker builds
 
-**On Pull Request:**- PR status comment with merge preview
 
-- Run unit tests with coverage- **NO Docker building or deployment**
 
-- Build application verification
+### Staging Pipeline (`staging.yml`)
 
-- PR status check**On Merge (Push to development):**
+**Triggered on:**
+- Push to `staging` branch
+- Pull requests to `staging` branch
 
-- Run tests with coverage
+**Pipeline Stages:**
+1. **📦 Build Application** - Builds React app and runs security audit
+2. **🧪 Unit Tests** - Runs unit tests with code coverage
+3. **🔗 Integration Tests** - Runs integration tests with coverage
+4. **✅ Build Verification** - Final build verification with artifacts (7-day retention)
+5. **⏸️ Docker Publish Approval** - **Manual approval gate** (only on merge)
+6. **🐳 Docker Build & Publish** - Builds and publishes to GHCR (only after approval)
+7. **� PR Feedback** - Updates PR with comprehensive status
 
-**On Merge to development:**- Build application
+**Docker Tags**: `staging-latest`, `staging-{commit-sha}`
 
-- Run unit tests with coverage- Build Docker image (separate from publish)
+**Focus**: Quality assurance with controlled Docker publishing
 
-- Build application- Publish Docker image to GitHub Container Registry
 
-- Build Docker image- Deploy to development environment
 
-- Publish to GitHub Container Registry (`dev-latest`, `dev-{commit}`)
+### Production Pipeline (`production.yml`)
 
-**Focus**: Fast PR feedback, efficient resource usage
+**Triggered on:**
+- Push to `production` branch
+- Pull requests to `production` branch
+- Manual workflow dispatch
 
-### Staging Pipeline (`staging.yml`)  
+**Pipeline Stages:**
+1. **📦 Build Application** - Builds production-ready React app
+2. **🧪 Unit Tests** - Runs unit tests with code coverage
+3. **🔗 Integration Tests** - Runs comprehensive integration tests
+4. **✅ Build Verification** - Final build verification with artifacts (30-day retention)
+5. **💬 PR Feedback** - Updates PR with deployment information
+6. **⏸️ Docker Publish Approval** - **Manual approval gate** (only on merge)
+7. **🐳 Docker Build & Publish** - Builds and publishes with versioning (only after approval)
 
-**On Pull Request:**### Staging Pipeline (`staging.yml`)
+**Docker Tags**: `latest`, `v{build-number}`, `{commit-sha}`, `prod-{timestamp}`
 
-- Run unit and integration tests**On Pull Request:**
-
-- Security scanning (npm audit)- Run full test suite including E2E tests
-
-- Build verification- Security scanning (npm audit)
-
-- Build application verification
-
-**On Merge to staging:**- **NO Docker building or deployment**
-
-- Run unit and integration tests
-
-- Security scanning (npm audit)**On Merge (Push to staging):**
-
-- Build application- Run full test suite including E2E tests
-
-- Build and publish Docker image (`staging-latest`, `staging-{commit}`)- Security scanning (npm audit)
-
-- Build application
-
-### Production Pipeline (`production.yml`)- Build and publish Docker image
-
-**On Pull Request:**- Deploy to staging environment
-
-- Comprehensive testing (unit + integration)- Run smoke tests
-
-- Security audits
-
-- Build quality verification**Focus**: Quality assurance, security validation, pre-production testing
-
-
-
-**On Merge to production:**### Production Pipeline (`production.yml`)
-
-- Comprehensive testing**On Pull Request:**
-
-- Security audits- Comprehensive pre-deployment checks
-
-- Production build- Security audits
-
-- Build and publish Docker image (`latest`, `prod-{commit}`, `v{build}`)- Build quality verification
-
-- Create GitHub release- **NO Docker building or deployment**
-
-
-
-## 🔧 Setup Requirements**On Merge (Push to production):**
-
-- Comprehensive pre-deployment checks
-
-### Repository Settings- Security audits
-
-Required permissions in GitHub Actions:- Build with production optimizations
-
-```yaml- Build and publish Docker image with versioning
-
-permissions:- Deploy to production with environment protection
-
-  contents: read          # Read repository content- Health checks and smoke tests
-
-  packages: write         # Write to GitHub Container Registry- Create GitHub release with automated tagging
-
-  pull-requests: write   # Comment on PRs- Post-deployment verification
-
-```
-
-**Focus**: Maximum safety, monitoring, automated release management
-
-### Branch Protection Rules
-
-Set up protection for all three branches:## 📋 Required Secrets and Configuration
-
-- Require pull request reviews
-
-- Require status checks to pass### GitHub Container Registry (Automatic)
-
-- Require branches to be up to date```
-
-- Include administrators# No additional secrets needed - using GITHUB_TOKEN automatically
-
-# GitHub Container Registry (ghcr.io) is used for public Docker images
-
-### Environment Configuration```
-
-1. Go to `Settings > Environments`
-
-2. Create environments: `development`, `staging`, `production`### Workflow Permissions (Required)
-
-3. Add protection rules for staging/production as neededThe workflows require these permissions (already configured):
-
-```yaml
-
-## 🐳 Container Registrypermissions:
-
-  contents: read          # Read repository content
-
-### GitHub Container Registry (GHCR)  packages: write         # Write to GitHub Container Registry
-
-- **Registry**: `ghcr.io`  pull-requests: write   # Comment on PRs
-
-- **Authentication**: Uses `GITHUB_TOKEN` automatically  issues: write          # Create deployment issues (production)
-
-- **Visibility**: Public packages (configurable)  deployments: write     # Create deployment statuses (production)
-
-```
-
-### Image Tagging Strategy
-
-```### Environment URLs (When You Have APIs)
-
-Development: ghcr.io/owner/repo:dev-latest, dev-{commit-sha}```
-
-Staging:     ghcr.io/owner/repo:staging-latest, staging-{commit-sha}  # Add these when you have backend APIs deployed:
-
-Production:  ghcr.io/owner/repo:latest, prod-{commit-sha}, v{build-number}# DEV_API_URL=https://api-dev.yourapp.com
-
-```# STAGING_API_URL=https://api-staging.yourapp.com
-
-# PROD_API_URL=https://api.yourapp.com
-
-## 🚀 Workflow Usage
-
-# These are for health checks after deployment:
-
-### Feature Development# STAGING_URL=https://staging.yourapp.com
-
-```bash# PROD_URL=https://yourapp.com
-
-# Create feature branch```
-
-git checkout -b feature/new-feature development
-
-# Make changes, commit, push### Security Scanning
-
-git push -u origin feature/new-feature```
-
-# Create PR to development → triggers tests only# Currently using npm audit (built-in, no token required)
-
-```# For advanced security scanning, add:
-
-# SNYK_TOKEN=your-snyk-token (optional)
-
-### Staging Promotion```
-
-```bash
-
-# Create PR from development to staging## 🛡️ Environment Protection Rules
-
-# Merge → triggers full staging pipeline with Docker build
-
-```Set up environment protection rules in GitHub (`Settings > Environments`):
-
-
-
-### Production Release### Development Environment
-
-```bash- No protection rules needed
-
-# Create PR from staging to production  - Automatic deployments
-
-# Merge → triggers production pipeline with release creation
-
-```### Staging Environment
-
-- Optional: Required reviewers
-
-## 📊 Pipeline Benefits- Optional: Wait timer (e.g., 5 minutes)
-
-
-
-### Performance Metrics### Production Environment
-
-- **Development PRs**: ~2 minutes (tests only)- **Required reviewers**: Add senior developers/DevOps team
-
-- **Staging Pipeline**: ~5 minutes (tests + Docker build)- **Wait timer**: 10-15 minutes for manual verification
-
-- **Production Pipeline**: ~7 minutes (full validation + release)- **Deployment branches**: Restrict to `production` branch only
-
-
-
-### Resource Efficiency## 🔧 Setup Instructions
-
-- 50%+ reduction in GitHub Actions usage
-
-- Faster developer feedback loop### 1. Create the Branch Structure
-
-- Cleaner container registry```bash
-
-- Strategic resource allocation# Create and push development branch
-
-git checkout -b development
-
-## 🔍 Monitoringgit push -u origin development
-
-
-
-### Pipeline Status# Create and push staging branch
-
-- Monitor in GitHub Actions tabgit checkout -b staging
-
-- Each job shows detailed execution logsgit push -u origin staging
-
-- Failed pipelines prevent deployment
-
-- PR status checks provide clear feedback# Create and push production branch (or rename main/master)
-
-git checkout -b production
-
-### Artifactsgit push -u origin production
-
-- **Development**: 7 days retention```
-
-- **Staging**: 30 days retention
-
-- **Production**: 90 days retention### 2. Configure Branch Protection
-
-Go to `Settings > Branches` and add protection rules:
-
-### Docker Images
-
-- Available at GitHub Packages**Development Branch:**
-
-- Public access configured- ✅ **Require pull request reviews before merging**
-
-- Tagged with commit SHA for rollback- ✅ **Require status checks to pass**
-
-- ✅ **Require branches to be up to date**
-
-## 🛡️ Security Features- ✅ **Include administrators**
-
-
-
-### Automated Security**Staging Branch:**
-
-- **npm audit**: Dependency vulnerability scanning- ✅ **Require pull request reviews before merging**
-
-- **Package visibility**: Controlled public access- ✅ **Require status checks to pass**
-
-- **Permissions**: Minimal required permissions- ✅ **Require branches to be up to date**
-
-- **Environment protection**: Required reviews for production- ✅ **Require conversation resolution**
-
-- ✅ **Include administrators**
-
-### Best Practices
-
-- All external dependencies are scanned**Production Branch:**
-
-- Docker images use minimal base images- ✅ **Require pull request reviews before merging**
-
-- No secrets in Docker images- ✅ **Dismiss stale reviews when new commits are pushed**
-
-- Environment-specific configurations- ✅ **Require status checks to pass**
-
-- ✅ **Require branches to be up to date**
-
-## 📚 Customization- ✅ **Require conversation resolution**
-
-- ✅ **Include administrators**
-
-### Adding New Steps- ✅ **Restrict pushes to specific people/teams** (optional)
-
-1. Edit appropriate workflow file in `.github/workflows/`
-
-2. Consider whether step should run on PR or only on merge> 🛡️ **Result**: Direct pushes to protected branches are **blocked**. All changes must go through Pull Requests with required approvals.
-
-3. Test in development environment first
-
-4. Follow existing job dependency structure### 3. Set Up Environments
-
-1. Go to `Settings > Environments`
-
-### Environment Variables2. Create environments: `development`, `staging`, `production`
-
-- **Workflow level**: Define in `env` section3. Configure protection rules as described above
-
-- **Repository level**: Add in Settings > Secrets
-
-- **Environment level**: Configure in Environment settings### 4. Add Required Secrets
-
-1. Go to `Settings > Secrets and variables > Actions`
-
-## 🎯 Current Status2. Add all the secrets listed above
+**Focus**: Maximum safety with manual control over Docker publishing
 
 
 
@@ -509,29 +224,241 @@ if: github.event_name == 'push' && github.ref == 'refs/heads/development'
 - **Parallel Jobs**: Tests and builds run in parallel where possible
 - **Artifact Reuse**: Build once, deploy many strategy
 
-## 📚 Additional Resources
+## � Required Setup
 
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Environment Protection Rules](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment)
-- [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
-- [Docker Build and Push Action](https://github.com/docker/build-push-action)
-- [Security Best Practices](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions)
+### 1. Environment Configuration
 
-## 🎯 Pipeline Benefits Summary
+Create two environments in GitHub (`Settings > Environments`):
+
+**staging-docker-publish**
+- Required reviewers: Add team members who should approve staging Docker builds
+- Wait timer: 1 minute minimum (GitHub requirement)
+- Deployment branches: Restrict to `staging` branch only
+
+**production-docker-publish**
+- Required reviewers: Add senior developers/DevOps team
+- Wait timer: 1 minute minimum
+- Deployment branches: Restrict to `production` branch only
+
+> ⚠️ **Important**: Without environment protection rules, Docker build stage will wait indefinitely for approval!
+
+### 2. Workflow Permissions
+
+The workflows require these permissions (already configured):
+
+```yaml
+permissions:
+  contents: read          # Read repository content
+  packages: write         # Write to GitHub Container Registry
+  pull-requests: write   # Comment on PRs
+```
+
+### 3. Branch Protection Rules
+
+Go to `Settings > Branches` and add protection rules:
+
+**Development Branch:**
+- ✅ Require pull request reviews before merging
+- ✅ Require status checks to pass
+- ✅ Require branches to be up to date
+
+**Staging Branch:**
+- ✅ Require pull request reviews before merging
+- ✅ Require status checks to pass
+- ✅ Require branches to be up to date
+- ✅ Require conversation resolution
+
+**Production Branch:**
+- ✅ Require pull request reviews before merging (2+ reviewers recommended)
+- ✅ Dismiss stale reviews when new commits are pushed
+- ✅ Require status checks to pass
+- ✅ Require branches to be up to date
+- ✅ Require conversation resolution
+- ✅ Include administrators
+
+## 🐳 Container Registry
+
+### GitHub Container Registry (GHCR)
+- **Registry**: `ghcr.io`
+- **Authentication**: Uses `GITHUB_TOKEN` automatically
+- **Visibility**: Public packages (configured automatically)
+- **Access**: Available at `https://github.com/OWNER/REPO/pkgs/container/PACKAGE`
+
+### Image Tagging Strategy
+```
+Staging:     ghcr.io/owner/repo:staging-latest, staging-{commit-sha}
+Production:  ghcr.io/owner/repo:latest, v{build-number}, {commit-sha}, prod-{timestamp}
+```
+
+## 🚀 Workflow Usage
+
+### Feature Development
+```bash
+# Create feature branch from development
+git checkout development
+git pull origin development
+git checkout -b feature/new-feature
+
+# Make changes, test locally
+npm test
+npm run build
+
+# Commit and push
+git add .
+git commit -m "feat: add new feature"
+git push -u origin feature/new-feature
+
+# Create PR to development
+# Pipeline runs: Build → Unit Tests → Build Verification → PR Feedback
+# NO Docker build during PR validation
+```
+
+### Staging Promotion
+```bash
+# Create PR from development to staging
+git checkout development
+git pull origin development
+git checkout -b promote/dev-to-staging
+git checkout staging
+git pull origin staging
+git checkout promote/dev-to-staging
+git merge development
+git push -u origin promote/dev-to-staging
+
+# Create PR to staging
+# After merge, pipeline runs and waits at Docker Publish Approval stage
+# Go to Actions tab → Click "Review deployments" → Approve
+# Docker image is built and published to GHCR
+```
+
+### Production Release
+```bash
+# Create PR from staging to production
+git checkout staging
+git pull origin staging
+git checkout -b promote/staging-to-prod
+git checkout production
+git pull origin production
+git checkout promote/staging-to-prod
+git merge staging
+git push -u origin promote/staging-to-prod
+
+# Create PR to production
+# After merge, pipeline runs and waits at Docker Publish Approval stage
+# Go to Actions tab → Click "Review deployments" → Approve
+# Docker image is built, published, and tagged with multiple versions
+```
+
+## ⏸️ Manual Docker Publish Approval
+
+### How It Works
+
+1. **PR Validation**: When you create a PR, only tests and build verification run
+2. **Merge to Branch**: After merge, pipeline runs all stages
+3. **Approval Gate**: Pipeline pauses at "Docker Publish Approval" stage
+4. **Review Button**: In GitHub Actions UI, you'll see a "Review deployments" button
+5. **Approve**: Click button, review, and approve to proceed
+6. **Docker Build**: After approval, Docker image is built and published
+
+### Approval Process
+
+**In GitHub Actions UI:**
+```
+1. Go to Actions tab
+2. Click on the running workflow
+3. See "Docker Publish Approval" job waiting
+4. Click "Review deployments" button
+5. Review details
+6. Click "Approve and deploy"
+7. Docker build proceeds automatically
+```
+
+### Who Can Approve?
+
+- Users/teams configured as "Required reviewers" in environment settings
+- Anyone with write access (if using wait timer without required reviewers)
+
+## 📊 Pipeline Benefits
 
 ### Resource Efficiency
-- **50%+ reduction** in GitHub Actions usage
-- **Cleaner container registry** with only production-ready images
-- **Faster PR feedback** without Docker build overhead
+- **No unnecessary Docker builds** during PR validation
+- **Manual control** over when Docker images are published
+- **Cleaner registry** with only approved, production-ready images
 
-### Developer Experience
-- **Clear feedback** on PRs with merge preview
-- **Predictable behavior** - Docker builds only on merge
-- **Better separation** of validation vs. deployment
+### Security & Control
+- **Explicit approval required** before publishing Docker images
+- **Audit trail** of who approved each Docker publish
+- **Prevent accidental publishes** from untested code
 
-### Cost and Performance
-- **Lower GitHub Actions costs** due to conditional execution
-- **Reduced storage costs** for container registry
-- **More efficient pipeline execution** with parallel jobs
+### Developer Experience  
+- **Fast PR feedback** (2-3 minutes) without waiting for Docker builds
+- **Clear separation** between validation and deployment
+- **Predictable workflow** - know when Docker builds will occur
 
-This optimized CI/CD pipeline follows industry best practices for efficient, secure, and reliable software delivery.
+## 🔍 Monitoring
+
+### Pipeline Status
+- Monitor in GitHub `Actions` tab
+- Each stage shows detailed execution logs
+- Failed stages prevent progression
+- PR comments provide comprehensive status updates
+
+### Build Artifacts
+- **Development**: 7 days retention
+- **Staging**: 7 days retention  
+- **Production**: 30 days retention
+
+### Docker Images
+- Available at GitHub Packages
+- Tagged with commit SHA for rollback capability
+- Public access configured automatically
+- Clickable links in pipeline summary
+
+## 🛡️ Security Features
+
+### Automated Security
+- **npm audit**: Dependency vulnerability scanning
+- **Package visibility**: Controlled public access
+- **Minimal permissions**: Only required permissions granted
+- **Environment protection**: Manual approval for critical stages
+
+### Best Practices
+- All dependencies scanned before Docker build
+- Docker images use optimized Nginx base
+- No secrets in Docker images
+- Environment-specific configurations managed securely
+
+## 📚 Customization
+
+### Adding New Pipeline Steps
+
+1. Edit the appropriate workflow file in `.github/workflows/`
+2. Consider stage placement (before or after approval)
+3. Test in development environment first
+4. Follow existing job dependency structure
+
+### Environment Variables
+- **Workflow level**: Define in `env` section of workflow files
+- **Repository level**: Add in `Settings > Secrets and variables > Actions`
+- **Environment level**: Configure in `Settings > Environments`
+
+## 🎯 Current Status
+
+### ✅ Implemented
+- Multi-stage pipeline architecture
+- Manual Docker publish approval gates
+- Automated testing in all environments
+- GitHub Container Registry integration
+- Comprehensive PR feedback with update/create logic
+- Clickable links to Docker images and commits
+
+### 🔄 Available Enhancements
+- Health check endpoints after deployment
+- Blue-green deployments
+- Advanced monitoring and alerting
+- Infrastructure as Code integration
+- Multi-region deployments
+
+---
+
+This CI/CD setup provides a solid foundation for reliable, controlled software delivery with explicit approval gates for critical deployment stages.
