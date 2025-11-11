@@ -90,10 +90,14 @@ jobs:
           });
 
   # Build and publish Docker image (only on merge to production)
+  # Requires manual approval - will pause and show "Review deployments" button
   build-and-publish:
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+    environment:
+      name: production-docker-publish
+      url: https://github.com/${{ github.repository }}/pkgs/container/client
     
     steps:
     - name: Checkout code
