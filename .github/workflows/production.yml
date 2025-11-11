@@ -173,20 +173,31 @@ jobs:
 
     - name: Image publication summary
       run: |
-        echo "## 🚀 Docker Image Published Successfully" >> $GITHUB_STEP_SUMMARY
+        echo "## 🚀 Production Docker Image Published Successfully" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Registry:** GitHub Container Registry" >> $GITHUB_STEP_SUMMARY  
         echo "**Image:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-        echo "- \`latest\` (latest production release)" >> $GITHUB_STEP_SUMMARY
-        echo "- \`${{ steps.meta.outputs.RELEASE_TAG }}\` (release number)" >> $GITHUB_STEP_SUMMARY
-        echo "- \`${{ steps.meta.outputs.SHORT_SHA }}\` (commit reference)" >> $GITHUB_STEP_SUMMARY
-        echo "- \`prod-${{ steps.meta.outputs.TIMESTAMP }}\` (deployment timestamp)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Published Tags:" >> $GITHUB_STEP_SUMMARY
+        echo "- [\`latest\`](https://github.com/${{ github.repository }}/pkgs/container/client) - Latest production release" >> $GITHUB_STEP_SUMMARY
+        echo "- [\`${{ steps.meta.outputs.RELEASE_TAG }}\`](https://github.com/${{ github.repository }}/pkgs/container/client) - Release version" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.SHORT_SHA }}\` - Commit reference" >> $GITHUB_STEP_SUMMARY
+        echo "- \`prod-${{ steps.meta.outputs.TIMESTAMP }}\` - Deployment timestamp" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links:" >> $GITHUB_STEP_SUMMARY
+        echo "- [View on GitHub Packages](https://github.com/${{ github.repository }}/pkgs/container/client)" >> $GITHUB_STEP_SUMMARY
+        echo "- [View commit ${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Infrastructure Deployment:** Use release tag \`${{ steps.meta.outputs.RELEASE_TAG }}\` for deployment" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Deployment Command Example:**" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Deployment Commands:" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-        echo "# Deploy specific release" >> $GITHUB_STEP_SUMMARY
+        echo "# Deploy latest production release" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ghcr.io/${{ github.repository }}:latest" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Deploy specific release version (recommended)" >> $GITHUB_STEP_SUMMARY
         echo "docker pull ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.RELEASE_TAG }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Deploy specific commit" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.SHORT_SHA }}" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
