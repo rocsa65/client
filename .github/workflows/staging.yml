@@ -76,15 +76,26 @@ jobs:
         path: build/
         retention-days: 7
 
-  # Build staging Docker image (only on push to staging)
-  # Requires manual approval - will pause and show "Review deployments" button
-  docker-build-and-publish:
+  # Manual approval gate for Docker image publishing
+  docker-publish-approval:
     runs-on: ubuntu-latest
     needs: [test, build-verification]
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     environment:
       name: staging-docker-publish
       url: https://github.com/${{ github.repository }}/pkgs/container/client
+    
+    steps:
+    - name: Approval checkpoint
+      run: |
+        echo "✅ Manual approval granted for Docker image publishing"
+        echo "Proceeding to build and publish staging Docker image..."
+
+  # Build and publish staging Docker image (runs after approval)
+  docker-build-and-publish:
+    runs-on: ubuntu-latest
+    needs: docker-publish-approval
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     
     steps:
     - name: Checkout code
